@@ -1,0 +1,384 @@
+================================================================
+SET A — ANSWERS (Diabetes Dataset)
+================================================================
+
+NOTE: Attempt any 4 questions
+
+----------------------------------------------------------------
+Q1. Load Diabetes Dataset, Display Info, Handle Missing Values
+(Apply – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+The sklearn diabetes dataset is a classic regression dataset with
+442 samples and 10 numerical features (age, sex, bmi, bp, and 6
+blood serum measurements). The target is a quantitative measure
+of disease progression one year after baseline.
+
+Steps:
+1. Import the dataset using sklearn.datasets.load_diabetes()
+2. Convert to pandas DataFrame
+3. Display first 5 rows and shape
+4. Check for missing values using isnull().sum()
+5. Handle missing values if any (sklearn datasets are pre-cleaned,
+   but we demonstrate best practice)
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_diabetes
+
+# Step 1: Load dataset
+diabetes = load_diabetes()
+
+# Step 2: Convert to DataFrame
+df = pd.DataFrame(diabetes.data, columns=diabetes.feature_names)
+df['target'] = diabetes.target
+
+# Step 3: Display first 5 rows
+print("First 5 Rows:")
+print(df.head())
+
+# Step 4: Display shape
+print("\nDataset Shape:", df.shape)
+# Output: (442, 11)
+
+# Step 5: Check for missing values
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# Step 6: Handle missing values (if any)
+# Since sklearn datasets are clean, no missing values exist.
+# But if there were, we handle them:
+if df.isnull().sum().sum() > 0:
+    df.fillna(df.mean(), inplace=True)  # Fill with column mean
+    print("\nMissing values handled by mean imputation.")
+else:
+    print("\nNo missing values found. Dataset is clean.")
+
+print("\nFinal Shape after handling:", df.shape)
+
+--- END CODE ---
+
+OUTPUT EXPLANATION:
+- Shape: (442, 11) — 442 rows, 10 features + 1 target
+- All missing value counts = 0 (clean dataset)
+- Mean imputation is a standard method for numerical missing data
+
+
+----------------------------------------------------------------
+Q2. Exploratory Data Analysis (EDA)
+(Analyze – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+EDA helps us understand data distribution, relationships between
+variables, and detect outliers before modeling.
+
+Tasks:
+a) Correlation Heatmap — shows linear relationship between all features
+b) Scatter plot between BMI and Target — shows how BMI impacts
+   diabetes progression
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_diabetes
+
+# Load data
+diabetes = load_diabetes()
+df = pd.DataFrame(diabetes.data, columns=diabetes.feature_names)
+df['target'] = diabetes.target
+
+# ---- (a) Correlation Heatmap ----
+plt.figure(figsize=(12, 8))
+corr = df.corr()
+sns.heatmap(
+    corr,
+    annot=True,
+    fmt=".2f",
+    cmap='coolwarm',
+    linewidths=0.5,
+    square=True
+)
+plt.title("Correlation Heatmap - Diabetes Dataset", fontsize=14)
+plt.tight_layout()
+plt.savefig('heatmap.png')
+plt.show()
+print("Heatmap saved as heatmap.png")
+
+# ---- (b) Scatter Plot: BMI vs Target ----
+plt.figure(figsize=(8, 5))
+plt.scatter(df['bmi'], df['target'], alpha=0.6, color='steelblue', edgecolors='white', s=60)
+plt.xlabel("BMI (Body Mass Index)", fontsize=12)
+plt.ylabel("Disease Progression (Target)", fontsize=12)
+plt.title("BMI vs Target - Diabetes Dataset", fontsize=14)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.savefig('scatter_bmi_target.png')
+plt.show()
+print("Scatter plot saved.")
+
+--- END CODE ---
+
+INTERPRETATION:
+- Heatmap: BMI has the highest positive correlation (~0.59) with
+  target among all features. S5 (blood serum) also has high correlation.
+- Scatter Plot: Clear positive trend — higher BMI → higher disease
+  progression. Some spread indicates other factors also influence target.
+
+
+----------------------------------------------------------------
+Q3. Linear Regression — Train, Predict, Evaluate
+(Apply – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+Linear Regression models the linear relationship between independent
+features (X) and a continuous target (y).
+
+Formula: y = β₀ + β₁x₁ + β₂x₂ + ... + βₙxₙ
+
+Evaluation Metrics:
+- RMSE (Root Mean Squared Error): measures average prediction error
+  in target units. Lower = better.
+  Formula: RMSE = sqrt(mean((y_actual - y_predicted)²))
+
+- R² Score (Coefficient of Determination): proportion of variance
+  explained by the model. Range: 0 to 1. Higher = better.
+  Formula: R² = 1 - SS_res / SS_tot
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_diabetes
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+
+# Load data
+diabetes = load_diabetes()
+df = pd.DataFrame(diabetes.data, columns=diabetes.feature_names)
+df['target'] = diabetes.target
+
+# Step 1: Separate features and target
+X = df.drop('target', axis=1)
+y = df['target']
+
+# Step 2: Split dataset (80% train, 20% test)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+print(f"Training size: {X_train.shape}, Testing size: {X_test.shape}")
+
+# Step 3: Apply Linear Regression
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Step 4: Predict on test data
+y_pred = model.predict(X_test)
+
+# Step 5: Evaluate
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+r2 = r2_score(y_test, y_pred)
+
+print(f"\nModel Evaluation:")
+print(f"  RMSE  : {rmse:.4f}")
+print(f"  R² Score: {r2:.4f}")
+
+# Optional: Visualize actual vs predicted
+plt.figure(figsize=(8,5))
+plt.scatter(y_test, y_pred, alpha=0.6, color='teal')
+plt.plot([y_test.min(), y_test.max()],
+         [y_test.min(), y_test.max()], 'r--', lw=2)
+plt.xlabel("Actual Values")
+plt.ylabel("Predicted Values")
+plt.title("Actual vs Predicted - Linear Regression")
+plt.tight_layout()
+plt.savefig('actual_vs_predicted.png')
+plt.show()
+
+--- END CODE ---
+
+EXPECTED OUTPUT:
+  RMSE   : ~53.85
+  R² Score: ~0.45 to 0.53
+
+INTERPRETATION:
+- R² ≈ 0.45–0.53 means the model explains ~50% of variance in target.
+- RMSE ≈ 54 means average prediction error is about 54 units.
+- The diagonal in the scatter plot shows how close predictions are to actuals.
+
+
+----------------------------------------------------------------
+Q4(a). Types of Unsupervised Learning
+(Understand – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+Unsupervised Learning is a type of machine learning where the model
+is trained on UNLABELED data. The algorithm finds hidden patterns,
+structures, or groupings without any predefined output labels.
+
+Main Types:
+
+1. CLUSTERING
+   - Groups similar data points together based on their features.
+   - Goal: Maximize intra-cluster similarity, minimize inter-cluster similarity.
+   - Types:
+     a) K-Means Clustering: Partitions data into K clusters by minimizing
+        the distance between data points and their cluster centroid.
+        Example: Customer segmentation (group customers by buying behavior)
+     b) Hierarchical Clustering: Builds a tree of clusters (dendrogram).
+        Example: Gene expression analysis in biology
+     c) DBSCAN: Density-based clustering; handles noise/outliers well.
+        Example: Detecting geographic clusters of crime incidents
+
+2. DIMENSIONALITY REDUCTION
+   - Reduces the number of features while preserving important information.
+   - Used to combat the "curse of dimensionality" and speed up algorithms.
+   - Types:
+     a) PCA (Principal Component Analysis): Projects data onto principal
+        components that capture maximum variance.
+        Example: Compressing image data from 1000 features to 50 components
+     b) t-SNE: For 2D/3D visualization of high-dimensional data.
+        Example: Visualizing word embeddings in NLP
+     c) Autoencoders (Neural Network based): Learn compressed representations.
+        Example: Image compression and denoising
+
+3. ASSOCIATION RULE LEARNING
+   - Finds interesting relationships (rules) between variables in large datasets.
+   - Used in market basket analysis.
+   - Algorithms: Apriori, FP-Growth
+   - Example: "Customers who buy bread and butter also tend to buy milk"
+     Rule: {bread, butter} → {milk} with confidence = 75%
+   - Key metrics: Support, Confidence, Lift
+
+4. ANOMALY / OUTLIER DETECTION
+   - Identifies rare data points that differ significantly from the majority.
+   - Example: Credit card fraud detection, network intrusion detection
+   - Algorithm: Isolation Forest, One-Class SVM
+
+COMPARISON TABLE:
+--------------------------------------------------
+Type             | Goal              | Example
+-----------------|-------------------|------------
+Clustering       | Group similar data| Customer segments
+Dim. Reduction   | Reduce features   | Image compression
+Association Rules| Find patterns     | Market basket
+Anomaly Detection| Find outliers     | Fraud detection
+--------------------------------------------------
+
+KEY POINT: Unlike supervised learning, there is no "right answer" to
+validate against. The quality is measured by domain relevance and
+metrics like silhouette score (clustering) or reconstruction error (PCA).
+
+
+----------------------------------------------------------------
+Q4(b). Why Odd K in KNN? Details of KNN Algorithm
+(Understand – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+--- WHY ODD K IN KNN? ---
+
+In KNN (K-Nearest Neighbors) for CLASSIFICATION, the predicted class
+is determined by majority voting among the K nearest neighbors.
+
+If K is EVEN, there is a possibility of a TIE.
+Example (K=4, Binary Classification):
+  - 2 neighbors say Class A, 2 say Class B → TIE → ambiguous prediction
+
+If K is ODD, a tie is IMPOSSIBLE in binary classification.
+Example (K=5):
+  - 3 say Class A, 2 say Class B → Clear winner: Class A
+
+For multi-class problems, odd K also reduces ties significantly.
+
+EXCEPTION: For regression (KNN Regressor), K can be even because
+we take the average of K neighbors, not a vote.
+
+ADDITIONAL CONSIDERATIONS FOR CHOOSING K:
+- Small K (e.g., K=1): Low bias, high variance → overfitting
+- Large K (e.g., K=50): High bias, low variance → underfitting
+- Best K is typically found using cross-validation
+- Rule of thumb: K = sqrt(n) where n = number of training samples
+
+--- KNN ALGORITHM DETAILS ---
+
+K-Nearest Neighbors (KNN) is a non-parametric, lazy learning algorithm.
+"Lazy" means it does not learn a model during training — it memorizes
+the entire training dataset and makes predictions at query time.
+
+ALGORITHM STEPS:
+Step 1: Choose the value of K
+Step 2: For a new (test) data point:
+        a) Calculate distance to ALL training points
+        b) Select K nearest neighbors (smallest distances)
+Step 3: For Classification → assign class by majority vote
+        For Regression → assign mean/median of K neighbors' values
+
+DISTANCE METRICS:
+- Euclidean Distance (most common):
+  d = sqrt(Σ(xᵢ - yᵢ)²)
+- Manhattan Distance:
+  d = Σ|xᵢ - yᵢ|
+- Minkowski Distance (generalized):
+  d = (Σ|xᵢ - yᵢ|ᵖ)^(1/p)
+
+ADVANTAGES:
+- Simple to understand and implement
+- No training phase (lazy learner)
+- Naturally handles multi-class problems
+- Adapts well to non-linear boundaries
+
+DISADVANTAGES:
+- Slow at prediction time for large datasets (computes all distances)
+- Sensitive to irrelevant features and scale → needs feature scaling
+- High memory usage (stores all training data)
+- Performance degrades in high-dimensional space
+
+WHEN TO USE KNN:
+- Small to medium datasets
+- When decision boundary is non-linear
+- When interpretability is important
+
+--- CODE (KNN Example) ---
+
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
+
+iris = load_iris()
+X, y = iris.data, iris.target
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42)
+
+knn = KNeighborsClassifier(n_neighbors=5)  # odd K
+knn.fit(X_train, y_train)
+y_pred = knn.predict(X_test)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+
+--- END CODE ---
+
+================================================================
+END OF SET A
+================================================================

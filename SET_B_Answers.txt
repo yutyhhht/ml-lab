@@ -1,0 +1,419 @@
+================================================================
+SET B — ANSWERS (Breast Cancer Dataset)
+================================================================
+
+NOTE: Attempt any 4 questions
+
+----------------------------------------------------------------
+Q1. Load Breast Cancer Dataset, Display Structure, Handle Missing Values
+(Apply – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+The sklearn Breast Cancer dataset contains 569 samples with 30
+numerical features derived from digitized images of fine needle
+aspirate (FNA) of breast masses. Target: 0 = Malignant, 1 = Benign.
+
+Steps:
+1. Load dataset using sklearn.datasets.load_breast_cancer()
+2. Convert to pandas DataFrame
+3. Use info() — shows dtypes, non-null counts, memory usage
+4. Use describe() — shows statistical summary (mean, std, min, max)
+5. Check and handle missing values
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_breast_cancer
+
+# Step 1: Load dataset
+bc = load_breast_cancer()
+
+# Step 2: Create DataFrame
+df = pd.DataFrame(bc.data, columns=bc.feature_names)
+df['target'] = bc.target
+
+# Step 3: Display structure with info()
+print("=== Dataset Info ===")
+print(df.info())
+
+# Step 4: Display statistical summary with describe()
+print("\n=== Statistical Description ===")
+print(df.describe())
+
+# Step 5: Check for missing values
+print("\n=== Missing Values per Column ===")
+print(df.isnull().sum())
+
+# Step 6: Handle missing values
+total_missing = df.isnull().sum().sum()
+if total_missing > 0:
+    # For numerical features, use mean imputation
+    df.fillna(df.mean(), inplace=True)
+    print(f"\n{total_missing} missing values filled with column means.")
+else:
+    print("\nNo missing values found. Dataset is ready for analysis.")
+
+print("\nFinal Dataset Shape:", df.shape)
+print("Classes:", bc.target_names)
+
+--- END CODE ---
+
+OUTPUT EXPLANATION:
+- info() shows: 569 entries, 31 columns, all float64/int64, no nulls
+- describe() shows statistics for each of 30 features + target
+- Shape: (569, 31)
+- No missing values in this sklearn dataset
+
+
+----------------------------------------------------------------
+Q2. EDA — Distribution Plots, Histogram, Correlation Heatmap
+(Analyze – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+EDA on Breast Cancer dataset:
+a) Distribution plots — show feature distributions (normal vs skewed)
+b) Histogram of 'mean radius' — a key feature for tumor diagnosis
+c) Correlation heatmap — shows feature relationships
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_breast_cancer
+
+bc = load_breast_cancer()
+df = pd.DataFrame(bc.data, columns=bc.feature_names)
+df['target'] = bc.target
+
+# ---- (a) Distribution Plots for first 5 features ----
+features_to_plot = bc.feature_names[:5]
+
+fig, axes = plt.subplots(1, 5, figsize=(20, 4))
+for i, feature in enumerate(features_to_plot):
+    sns.histplot(df[feature], kde=True, ax=axes[i], color='steelblue')
+    axes[i].set_title(f'{feature}', fontsize=9)
+    axes[i].set_xlabel('')
+fig.suptitle("Distribution Plots — First 5 Features", fontsize=13)
+plt.tight_layout()
+plt.savefig('distribution_plots.png')
+plt.show()
+print("Distribution plots saved.")
+
+# ---- (b) Histogram of 'mean radius' ----
+plt.figure(figsize=(8, 5))
+plt.hist(df['mean radius'], bins=30, color='coral', edgecolor='black', alpha=0.8)
+plt.xlabel("Mean Radius", fontsize=12)
+plt.ylabel("Frequency", fontsize=12)
+plt.title("Histogram of Mean Radius Feature", fontsize=14)
+plt.grid(axis='y', linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.savefig('mean_radius_histogram.png')
+plt.show()
+print("Histogram saved.")
+
+# ---- (c) Correlation Heatmap (first 10 features for clarity) ----
+plt.figure(figsize=(12, 10))
+corr = df[list(bc.feature_names[:10]) + ['target']].corr()
+sns.heatmap(
+    corr, annot=True, fmt=".2f",
+    cmap='RdYlGn', linewidths=0.5, square=True
+)
+plt.title("Correlation Heatmap — Breast Cancer Dataset (First 10 Features)", fontsize=12)
+plt.tight_layout()
+plt.savefig('bc_heatmap.png')
+plt.show()
+print("Heatmap saved.")
+
+--- END CODE ---
+
+INTERPRETATION:
+- Mean radius distribution is right-skewed (most tumors are smaller)
+- Strong negative correlation between 'mean radius' and target (0=Malignant)
+  suggests larger tumors tend to be malignant
+- Some features are highly correlated with each other (multicollinearity)
+
+
+----------------------------------------------------------------
+Q3. Decision Tree Classifier — Split, Train, Evaluate
+(Apply – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+Decision Tree Classifier is a supervised learning algorithm that
+splits data based on feature thresholds to maximize information
+gain (using Gini Impurity or Entropy).
+
+Key Concepts:
+- Gini Impurity: G = 1 - Σpᵢ²
+- Information Gain: IG = Entropy(parent) - weighted_avg_Entropy(children)
+- The tree splits until a stopping criterion (max_depth, min_samples) is met
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.metrics import (accuracy_score, classification_report,
+                             confusion_matrix)
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+bc = load_breast_cancer()
+df = pd.DataFrame(bc.data, columns=bc.feature_names)
+df['target'] = bc.target
+
+X = df.drop('target', axis=1)
+y = df['target']
+
+# Step 1: Split dataset (80/20)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+print(f"Train: {X_train.shape}, Test: {X_test.shape}")
+
+# Step 2: Apply Decision Tree Classifier
+dt = DecisionTreeClassifier(max_depth=5, random_state=42)
+dt.fit(X_train, y_train)
+
+# Step 3: Predict
+y_pred = dt.predict(X_test)
+
+# Step 4: Evaluate
+acc = accuracy_score(y_test, y_pred)
+print(f"\nAccuracy: {acc:.4f}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=bc.target_names))
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(6, 4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=bc.target_names, yticklabels=bc.target_names)
+plt.title("Confusion Matrix — Decision Tree")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.tight_layout()
+plt.savefig('confusion_matrix.png')
+plt.show()
+
+# Visualize Tree
+plt.figure(figsize=(20, 8))
+plot_tree(dt, feature_names=bc.feature_names,
+          class_names=bc.target_names, filled=True,
+          max_depth=3, fontsize=8)
+plt.title("Decision Tree Visualization (depth=3)")
+plt.tight_layout()
+plt.savefig('decision_tree.png')
+plt.show()
+print("Tree visualization saved.")
+
+--- END CODE ---
+
+EXPECTED OUTPUT:
+  Accuracy: ~0.93–0.96
+  High precision and recall for both malignant and benign classes
+
+INTERPRETATION:
+- Accuracy ~94% means the model correctly classifies 94% of tumors
+- Confusion matrix shows how many are correctly/incorrectly classified
+- max_depth=5 prevents overfitting on training data
+
+
+----------------------------------------------------------------
+Q4(a). Bagging vs Boosting + Boosting Techniques
+(Understand – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+Both Bagging and Boosting are ensemble learning methods that combine
+multiple weak models to create a stronger model.
+
+--- BAGGING (Bootstrap Aggregating) ---
+
+CONCEPT:
+- Train multiple models INDEPENDENTLY on different random subsets
+  of the training data (with replacement = bootstrap sampling)
+- Final prediction = average (regression) or majority vote (classification)
+- Models are trained IN PARALLEL
+
+GOAL: Reduce VARIANCE (overfitting)
+
+HOW IT WORKS:
+1. Create n bootstrap samples from training data
+2. Train n independent models on these samples
+3. Aggregate predictions (average/vote)
+
+EXAMPLE ALGORITHM: Random Forest
+- Builds multiple Decision Trees on bootstrap samples
+- Each tree also uses a random subset of features
+- Final prediction = majority vote of all trees
+
+CHARACTERISTICS:
+- Reduces overfitting
+- Good for high-variance models (e.g., deep trees)
+- Models are independent
+
+--- BOOSTING ---
+
+CONCEPT:
+- Train models SEQUENTIALLY, where each new model tries to correct
+  the ERRORS made by the previous model
+- Misclassified samples get higher weights in the next round
+- Final prediction = weighted combination of all models
+
+GOAL: Reduce BIAS (underfitting)
+
+HOW IT WORKS:
+1. Train a weak model on original data
+2. Find misclassified/high-error samples
+3. Increase their weights (give more importance)
+4. Train next model on re-weighted data
+5. Repeat for n rounds
+6. Combine all models with weighted voting
+
+CHARACTERISTICS:
+- Sequential (cannot parallelize like Bagging)
+- More prone to overfitting if too many rounds
+- Better accuracy on complex tasks
+
+--- COMPARISON TABLE ---
+
+Feature         | Bagging              | Boosting
+----------------|----------------------|-----------------------
+Training        | Parallel             | Sequential
+Goal            | Reduce Variance      | Reduce Bias
+Sample weights  | Equal                | Adaptive (focus errors)
+Base learners   | Independent          | Dependent on previous
+Overfitting     | Less prone           | More prone
+Example         | Random Forest        | AdaBoost, XGBoost
+
+--- BOOSTING TECHNIQUES ---
+
+1. AdaBoost (Adaptive Boosting)
+   - Original boosting algorithm by Freund & Schapire (1996)
+   - Increases weights of misclassified samples after each round
+   - Uses decision stumps (depth-1 trees) as weak learners
+   - Final model = weighted sum of weak learners
+
+2. Gradient Boosting Machine (GBM)
+   - Fits new models to the RESIDUAL ERRORS of previous models
+   - Uses gradient descent to minimize a loss function
+   - More flexible — works with any differentiable loss function
+
+3. XGBoost (Extreme Gradient Boosting)
+   - Highly optimized, regularized version of Gradient Boosting
+   - Supports parallel processing within trees
+   - Includes L1/L2 regularization to prevent overfitting
+   - Most widely used in ML competitions (Kaggle)
+
+4. LightGBM (Light Gradient Boosting Machine)
+   - By Microsoft; faster and more memory-efficient than XGBoost
+   - Uses leaf-wise tree growth (vs level-wise in XGBoost)
+   - Excellent for large datasets
+
+5. CatBoost (Categorical Boosting)
+   - By Yandex; handles categorical features natively
+   - No need for one-hot encoding
+   - Resistant to overfitting on small datasets
+
+SUMMARY:
+- Use Bagging (Random Forest) when model has high variance
+- Use Boosting (XGBoost, LightGBM) when you need higher accuracy
+  and have enough data to prevent overfitting
+
+
+----------------------------------------------------------------
+Q4(b). How to Reduce Overfitting — Two Methods
+(Understand – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+OVERFITTING occurs when a model learns the training data TOO WELL,
+including noise and random fluctuations, leading to:
+- High training accuracy
+- Low testing/validation accuracy
+- Poor generalization to new data
+
+--- METHOD 1: REGULARIZATION ---
+
+Regularization adds a PENALTY TERM to the loss function to discourage
+the model from learning overly complex patterns.
+
+(a) L1 Regularization (Lasso):
+    Loss = MSE + λ * Σ|wᵢ|
+    - Shrinks some weights to exactly ZERO → feature selection
+    - Produces sparse models
+
+(b) L2 Regularization (Ridge):
+    Loss = MSE + λ * Σwᵢ²
+    - Shrinks all weights toward zero but not to zero
+    - Distributes weight across all features
+
+(c) ElasticNet: Combines L1 + L2
+
+HOW IT PREVENTS OVERFITTING:
+- Penalizes large weight values
+- Forces the model to be simpler
+- λ (lambda) controls regularization strength:
+  - λ = 0 → no regularization (may overfit)
+  - Large λ → strong regularization (may underfit)
+
+CODE EXAMPLE:
+    from sklearn.linear_model import Ridge, Lasso
+    ridge = Ridge(alpha=1.0)
+    ridge.fit(X_train, y_train)
+
+--- METHOD 2: CROSS-VALIDATION + EARLY STOPPING ---
+
+(a) K-Fold Cross-Validation:
+    - Split data into K equal folds
+    - Train on K-1 folds, validate on 1 fold
+    - Repeat K times, average the validation scores
+    - Gives a more reliable estimate of model performance
+    - Prevents fitting to a specific train/test split
+
+    from sklearn.model_selection import cross_val_score
+    scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+    print("CV Scores:", scores.mean())
+
+(b) Early Stopping (for Neural Networks/Gradient Boosting):
+    - Monitor validation loss during training
+    - Stop training when validation loss STOPS IMPROVING
+    - Prevents the model from memorizing training data
+
+    # XGBoost Early Stopping Example:
+    from xgboost import XGBClassifier
+    xgb = XGBClassifier(n_estimators=500)
+    xgb.fit(X_train, y_train,
+            eval_set=[(X_test, y_test)],
+            early_stopping_rounds=10)
+
+OTHER METHODS (Brief Mention):
+3. Dropout (Neural Networks): Randomly deactivate neurons during training
+4. Data Augmentation: Increase training data artificially
+5. Reducing Model Complexity: Use fewer layers, depth, or parameters
+6. More Training Data: More data → harder to overfit
+
+DIAGRAM:
+Underfitting  ←————— Optimal ——————→  Overfitting
+(High Bias)       (Balance)            (High Variance)
+  Simple model      Right complexity     Too complex
+  Low train acc     High train acc       Very high train acc
+  Low test acc      High test acc        Low test acc
+
+================================================================
+END OF SET B
+================================================================

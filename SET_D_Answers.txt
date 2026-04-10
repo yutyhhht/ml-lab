@@ -1,0 +1,533 @@
+================================================================
+SET D — ANSWERS (Iris Dataset)
+================================================================
+
+NOTE: Attempt any 4 questions
+
+----------------------------------------------------------------
+Q1. Load Iris Dataset, Convert to DataFrame, Apply StandardScaler
+(Apply – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+The Iris dataset contains 150 samples from 3 species of iris flowers
+(Setosa, Versicolor, Virginica) with 4 features each:
+sepal length, sepal width, petal length, petal width.
+It is the "Hello World" of machine learning.
+
+StandardScaler transforms each feature to:
+  Mean = 0, Standard Deviation = 1
+  Formula: z = (x - μ) / σ
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
+
+# Step 1: Load dataset
+iris = load_iris()
+
+# Step 2: Convert to DataFrame
+df = pd.DataFrame(iris.data, columns=iris.feature_names)
+df['target'] = iris.target
+df['species'] = df['target'].map({
+    0: 'setosa', 1: 'versicolor', 2: 'virginica'
+})
+
+print("=== Original Dataset ===")
+print(df.head(10))
+print("\nShape:", df.shape)
+
+print("\n=== Before Scaling — Statistics ===")
+print(df[iris.feature_names].describe().round(3))
+
+# Step 3: Apply StandardScaler to features only
+X = df[iris.feature_names]
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Create scaled DataFrame
+df_scaled = pd.DataFrame(X_scaled, columns=iris.feature_names)
+df_scaled['target'] = iris.target
+
+print("\n=== Scaled Features (First 10 Rows) ===")
+print(df_scaled.head(10).round(4))
+
+print("\n=== After Scaling — Statistics ===")
+print(df_scaled[iris.feature_names].describe().round(4))
+# Mean ≈ 0.0, Std ≈ 1.0 for all features
+
+# Verify scaling
+print("\n=== Verification ===")
+for col in iris.feature_names:
+    print(f"{col}: mean={df_scaled[col].mean():.6f}, std={df_scaled[col].std():.4f}")
+
+--- END CODE ---
+
+OUTPUT EXPLANATION:
+- Original 'sepal length (cm)': mean ≈ 5.84, std ≈ 0.83
+- Scaled  'sepal length (cm)': mean ≈ 0.00, std ≈ 1.00
+- This ensures distance-based algorithms treat all features equally
+
+
+----------------------------------------------------------------
+Q2. Plot Sepal vs Petal Length, Handle Missing Values, Pairplot
+(Analyze – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_iris
+
+# Load data
+iris = load_iris()
+df = pd.DataFrame(iris.data, columns=iris.feature_names)
+df['target'] = iris.target
+df['species'] = df['target'].map({
+    0: 'setosa', 1: 'versicolor', 2: 'virginica'
+})
+
+# ---- Step 1: Handle Missing Values ----
+print("=== Missing Values ===")
+print(df.isnull().sum())
+
+if df.isnull().sum().sum() > 0:
+    df.fillna(df.median(), inplace=True)
+    print("Missing values filled with median.")
+else:
+    print("No missing values found. Dataset is clean.")
+
+# ---- Step 2: Scatter Plot — Sepal Length vs Petal Length ----
+plt.figure(figsize=(9, 6))
+colors = {'setosa': '#e63946', 'versicolor': '#2a9d8f', 'virginica': '#457b9d'}
+
+for species, group in df.groupby('species'):
+    plt.scatter(
+        group['sepal length (cm)'],
+        group['petal length (cm)'],
+        label=species,
+        color=colors[species],
+        s=70, alpha=0.8, edgecolors='white'
+    )
+
+plt.xlabel("Sepal Length (cm)", fontsize=12)
+plt.ylabel("Petal Length (cm)", fontsize=12)
+plt.title("Sepal Length vs Petal Length — Iris Dataset", fontsize=14)
+plt.legend(title="Species")
+plt.grid(True, linestyle='--', alpha=0.4)
+plt.tight_layout()
+plt.savefig('sepal_vs_petal.png')
+plt.show()
+print("Scatter plot saved.")
+
+# ---- Step 3: Pairplot using Seaborn ----
+# Pairplot shows scatter plot for every pair of features + distribution on diagonal
+plt.figure()
+pairplot = sns.pairplot(
+    df,
+    hue='species',
+    palette={'setosa': '#e63946', 'versicolor': '#2a9d8f', 'virginica': '#457b9d'},
+    diag_kind='kde',    # Kernel Density Estimate on diagonal
+    plot_kws={'alpha': 0.7, 's': 50}
+)
+pairplot.fig.suptitle("Pairplot — Iris Dataset", y=1.02, fontsize=14)
+plt.tight_layout()
+plt.savefig('iris_pairplot.png')
+plt.show()
+print("Pairplot saved.")
+
+--- END CODE ---
+
+INTERPRETATION:
+SCATTER PLOT:
+  - Setosa has SHORT petal length despite varying sepal length
+    → Clearly separable from others
+  - Versicolor and Virginica overlap slightly
+  - Petal length is a STRONG discriminator between species
+
+PAIRPLOT:
+  - petal length vs petal width: best separation between all 3 classes
+  - sepal width: least discriminative feature
+  - Setosa forms a completely isolated cluster
+  - 6 feature pair combinations shown simultaneously
+
+
+----------------------------------------------------------------
+Q3. KNN (k=5) vs Logistic Regression — Accuracy Comparison
+(Evaluate – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+This question compares two popular classification algorithms on the
+Iris dataset with 80% training data.
+
+KNN: Non-parametric, instance-based learner
+Logistic Regression: Parametric, model-based learner
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (accuracy_score, classification_report,
+                             confusion_matrix, ConfusionMatrixDisplay)
+import matplotlib.pyplot as plt
+
+# Load and prepare data
+iris = load_iris()
+X, y = iris.data, iris.target
+
+# Scale features (important for both KNN and Logistic Regression)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Split — 80% training, 20% testing
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42
+)
+print(f"Training samples: {len(X_train)}")  # 120
+print(f"Testing  samples: {len(X_test)}")   # 30
+
+# ---- Model 1: KNN with K=5 ----
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+y_pred_knn = knn.predict(X_test)
+acc_knn = accuracy_score(y_test, y_pred_knn)
+
+print("\n=== KNN (K=5) Results ===")
+print(f"Accuracy: {acc_knn:.4f}")
+print(classification_report(y_test, y_pred_knn,
+                             target_names=iris.target_names))
+
+# ---- Model 2: Logistic Regression ----
+lr = LogisticRegression(max_iter=200, random_state=42)
+lr.fit(X_train, y_train)
+y_pred_lr = lr.predict(X_test)
+acc_lr = accuracy_score(y_test, y_pred_lr)
+
+print("=== Logistic Regression Results ===")
+print(f"Accuracy: {acc_lr:.4f}")
+print(classification_report(y_test, y_pred_lr,
+                             target_names=iris.target_names))
+
+# ---- Cross-Validation Comparison ----
+knn_cv_scores = cross_val_score(KNeighborsClassifier(n_neighbors=5),
+                                X_scaled, y, cv=5)
+lr_cv_scores = cross_val_score(LogisticRegression(max_iter=200, random_state=42),
+                               X_scaled, y, cv=5)
+
+print("=== 5-Fold Cross-Validation ===")
+print(f"KNN  CV Scores: {knn_cv_scores.round(4)} | Mean: {knn_cv_scores.mean():.4f}")
+print(f"LR   CV Scores: {lr_cv_scores.round(4)}  | Mean: {lr_cv_scores.mean():.4f}")
+
+# ---- Comparison Bar Chart ----
+methods = ['KNN (K=5)', 'Logistic Regression']
+test_accs = [acc_knn, acc_lr]
+cv_accs = [knn_cv_scores.mean(), lr_cv_scores.mean()]
+
+x = np.arange(len(methods))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(8, 5))
+bars1 = ax.bar(x - width/2, test_accs, width, label='Test Accuracy',
+               color=['steelblue', 'coral'], alpha=0.85)
+bars2 = ax.bar(x + width/2, cv_accs, width, label='CV Accuracy (mean)',
+               color=['steelblue', 'coral'], alpha=0.45, hatch='//')
+
+ax.set_ylabel('Accuracy')
+ax.set_title('KNN vs Logistic Regression — Iris Dataset')
+ax.set_xticks(x)
+ax.set_xticklabels(methods)
+ax.set_ylim([0.85, 1.05])
+ax.legend()
+
+for bar in bars1:
+    ax.annotate(f'{bar.get_height():.4f}',
+                xy=(bar.get_x() + bar.get_width()/2, bar.get_height()),
+                xytext=(0, 3), textcoords="offset points", ha='center')
+for bar in bars2:
+    ax.annotate(f'{bar.get_height():.4f}',
+                xy=(bar.get_x() + bar.get_width()/2, bar.get_height()),
+                xytext=(0, 3), textcoords="offset points", ha='center')
+
+plt.tight_layout()
+plt.savefig('knn_vs_lr.png')
+plt.show()
+print("Comparison chart saved.")
+
+--- END CODE ---
+
+EXPECTED OUTPUT:
+  KNN (K=5) Accuracy:          ~0.9667–1.0000
+  Logistic Regression Accuracy: ~0.9667–1.0000
+  CV Scores: Both ~0.96–0.98
+
+COMPARISON ANALYSIS:
+-----------------------------------------------------------------
+Feature             | KNN (K=5)           | Logistic Regression
+--------------------|---------------------|---------------------
+Type                | Lazy learner        | Parametric model
+Training time       | O(1) — no training  | O(n×d) — trains model
+Prediction time     | O(n) — slow         | O(d) — fast
+Interpretability    | Low (black box)     | High (coefficients)
+Works with scaling  | Required            | Recommended
+Handles non-linear  | Yes                 | Limited (linear boundary)
+Memory usage        | High (stores data)  | Low (stores params)
+-----------------------------------------------------------------
+
+CONCLUSION:
+Both perform similarly on Iris (~96-100% accuracy).
+- Use Logistic Regression when: you need interpretability and fast predictions
+- Use KNN when: decision boundary is non-linear and dataset is small
+
+
+----------------------------------------------------------------
+Q4(a). Hard Margin vs Soft Margin SVM
+(Analyze – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+SVM (Support Vector Machine) finds the OPTIMAL HYPERPLANE that
+maximizes the MARGIN between two classes.
+
+Key Terms:
+- Hyperplane: Decision boundary (line in 2D, plane in 3D, hyperplane in nD)
+- Support Vectors: Data points closest to the hyperplane
+- Margin: Distance between hyperplane and nearest data points of each class
+          Margin = 2 / ||w|| (we want to MAXIMIZE this)
+
+--- HARD MARGIN SVM ---
+
+DEFINITION:
+  Hard Margin SVM requires ALL training data points to be correctly
+  classified with NO violations — all points must lie OUTSIDE the margin.
+
+OBJECTIVE:
+  Minimize: (1/2)||w||²
+  Subject to: yᵢ(w·xᵢ + b) ≥ 1  for all i
+
+  Where:
+    w = weight vector (normal to hyperplane)
+    b = bias
+    yᵢ = class label (+1 or -1)
+    xᵢ = feature vector
+
+CONDITION:
+  yᵢ(w·xᵢ + b) ≥ 1
+    → For class +1: w·x + b ≥ +1
+    → For class -1: w·x + b ≤ -1
+
+LIMITATION:
+  - Only works when data is LINEARLY SEPARABLE
+  - Fails completely if any single outlier is present
+  - Extremely sensitive to noise and outliers
+  - NOT practical for real-world messy data
+
+--- SOFT MARGIN SVM ---
+
+DEFINITION:
+  Soft Margin SVM ALLOWS some misclassifications and margin violations
+  by introducing SLACK VARIABLES (ξᵢ ≥ 0).
+
+OBJECTIVE:
+  Minimize: (1/2)||w||² + C * Σξᵢ
+  Subject to: yᵢ(w·xᵢ + b) ≥ 1 - ξᵢ  and  ξᵢ ≥ 0
+
+  Where:
+    ξᵢ (xi) = slack variable for sample i
+      ξᵢ = 0: point correctly classified, outside margin
+      0 < ξᵢ ≤ 1: point correctly classified, inside margin
+      ξᵢ > 1: point MISCLASSIFIED
+
+    C = Regularization parameter (penalty for misclassification)
+      Large C → narrow margin, fewer errors (may overfit)
+      Small C → wide margin, more errors allowed (more general)
+
+COMPARISON TABLE:
+------------------------------------------------------
+Feature         | Hard Margin SVM     | Soft Margin SVM
+----------------|---------------------|----------------
+Data requirement| Linearly separable  | Any data
+Slack variables | None (ξᵢ = 0)       | ξᵢ ≥ 0
+Margin          | Perfect (rigid)     | Flexible
+Outlier handling| Fails               | Tolerates outliers
+Real-world use  | Rarely used         | Standard choice
+Hyperparameter  | None                | C (penalty param)
+------------------------------------------------------
+
+CODE EXAMPLE:
+  from sklearn.svm import SVC
+
+  # Hard Margin (C very large → approaches hard margin)
+  svm_hard = SVC(kernel='linear', C=1e6)
+
+  # Soft Margin (typical C values: 0.1, 1, 10, 100)
+  svm_soft = SVC(kernel='linear', C=1.0)
+
+  svm_soft.fit(X_train, y_train)
+  print("Support Vectors:", svm_soft.support_vectors_.shape)
+
+KERNEL TRICK (Extension):
+  For non-linearly separable data, kernels map to higher dimensions:
+  - Linear: K(x,y) = xᵀy
+  - RBF (Radial Basis Function): K(x,y) = exp(-γ||x-y||²)
+  - Polynomial: K(x,y) = (xᵀy + 1)^d
+
+GEOMETRIC INTUITION:
+  Hard Margin: Both classes must be beyond the margin boundary
+  Soft Margin: Allow a few points to be inside or across the margin
+               with a penalty proportional to how far they violate it
+
+
+----------------------------------------------------------------
+Q4(b). Naive Bayes Algorithm — Details and Prerequisites
+(Understand – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+--- NAIVE BAYES ALGORITHM ---
+
+Naive Bayes is a probabilistic classification algorithm based on
+BAYES' THEOREM with a NAIVE (strong) assumption of CONDITIONAL
+INDEPENDENCE between features.
+
+--- BAYES' THEOREM ---
+
+  P(C|X) = [P(X|C) × P(C)] / P(X)
+
+Where:
+  P(C|X)  = Posterior probability: P(class C given features X)
+  P(X|C)  = Likelihood: P(features X given class C)
+  P(C)    = Prior probability: P(class C) in training data
+  P(X)    = Evidence: P(features X) — normalizing constant
+
+GOAL: Find the class C that maximizes P(C|X)
+      ŷ = argmax_C [ P(C) × Π P(xᵢ|C) ]
+
+--- THE NAIVE ASSUMPTION ---
+
+"Naive" = assumes ALL features are CONDITIONALLY INDEPENDENT given the class
+
+  P(X|C) = P(x₁|C) × P(x₂|C) × ... × P(xₙ|C)
+
+This simplifies calculation enormously.
+In reality, features are rarely independent, but the algorithm still
+works well in practice (especially for text classification).
+
+--- WORKING EXAMPLE ---
+
+Email Spam Detection:
+Features: "free", "money", "hello", "meeting"
+
+For email: "free money offer"
+  P(Spam | "free", "money")
+    = P(Spam) × P("free"|Spam) × P("money"|Spam)
+    = 0.40 × 0.80 × 0.70 = 0.224
+
+  P(Ham | "free", "money")
+    = P(Ham) × P("free"|Ham) × P("money"|Ham)
+    = 0.60 × 0.10 × 0.05 = 0.003
+
+  → Predicted class: SPAM (higher posterior probability)
+
+--- TYPES OF NAIVE BAYES ---
+
+1. Gaussian Naive Bayes
+   - For CONTINUOUS features
+   - Assumes features follow Normal (Gaussian) distribution
+   - P(xᵢ|C) = (1/√(2πσ²)) × exp(-(xᵢ-μ)²/(2σ²))
+   - Example: Medical diagnosis, Iris classification
+   - Code: from sklearn.naive_bayes import GaussianNB
+
+2. Multinomial Naive Bayes
+   - For DISCRETE COUNT data (word frequencies)
+   - Most common for TEXT classification
+   - Example: Document categorization, spam detection
+   - Code: from sklearn.naive_bayes import MultinomialNB
+
+3. Bernoulli Naive Bayes
+   - For BINARY features (word present=1, absent=0)
+   - Example: Sentiment analysis, email filtering
+   - Code: from sklearn.naive_bayes import BernoulliNB
+
+--- PREREQUISITES / ASSUMPTIONS ---
+
+1. CONDITIONAL INDEPENDENCE (The Naive Assumption):
+   All features must be independent of each other given the class.
+   This is the core (and often violated) assumption.
+
+2. FEATURE DISTRIBUTION:
+   - Gaussian NB: features should follow Gaussian distribution
+   - Multinomial NB: features should be non-negative counts
+   - Bernoulli NB: features should be binary (0 or 1)
+
+3. SUFFICIENT TRAINING DATA:
+   The algorithm estimates P(xᵢ|C) from training data.
+   Very small samples lead to unreliable probability estimates.
+
+4. ZERO PROBABILITY PROBLEM:
+   If P(xᵢ|C) = 0 for any feature, entire posterior becomes 0
+   Solution: LAPLACE SMOOTHING (add-1 smoothing)
+   P(xᵢ|C) = (count(xᵢ,C) + 1) / (count(C) + |V|)
+
+--- ADVANTAGES ---
+  ✓ Very fast training and prediction
+  ✓ Works well with small datasets
+  ✓ Handles high-dimensional data (e.g., text) well
+  ✓ No complex hyperparameter tuning
+  ✓ Multi-class problems handled naturally
+
+--- DISADVANTAGES ---
+  ✗ Naive independence assumption is often violated
+  ✗ Poor probability estimates (well-calibrated scores not guaranteed)
+  ✗ Gaussian NB performs poorly if data is not normally distributed
+  ✗ Cannot capture complex feature relationships
+
+--- CODE EXAMPLE ---
+
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import accuracy_score, classification_report
+
+iris = load_iris()
+X_train, X_test, y_train, y_test = train_test_split(
+    iris.data, iris.target, test_size=0.2, random_state=42
+)
+
+# Apply Gaussian Naive Bayes
+gnb = GaussianNB()
+gnb.fit(X_train, y_train)
+y_pred = gnb.predict(X_test)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print(classification_report(y_test, y_pred, target_names=iris.target_names))
+
+# Expected Accuracy: ~0.93–1.00 on Iris
+
+--- APPLICATIONS ---
+  - Email spam filtering (Multinomial NB)
+  - Sentiment analysis (Bernoulli/Multinomial NB)
+  - Medical diagnosis (Gaussian NB)
+  - Document classification (Multinomial NB)
+  - Real-time prediction (due to speed)
+
+================================================================
+END OF SET D
+================================================================

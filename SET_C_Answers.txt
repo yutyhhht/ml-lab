@@ -1,0 +1,436 @@
+================================================================
+SET C — ANSWERS (Wine Dataset)
+================================================================
+
+NOTE: Attempt any 4 questions
+
+----------------------------------------------------------------
+Q1. Load Wine Dataset, Display Summary Statistics, Separate X and y
+(Apply – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+The sklearn Wine dataset contains 178 samples from 3 classes of
+Italian wine, with 13 chemical feature measurements (alcohol, malic
+acid, ash, flavanoids, etc.). Target: 0, 1, or 2 (wine type).
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_wine
+
+# Step 1: Load dataset
+wine = load_wine()
+
+# Step 2: Convert to DataFrame
+df = pd.DataFrame(wine.data, columns=wine.feature_names)
+df['target'] = wine.target
+
+# Step 3: Display basic info
+print("=== Dataset Shape ===")
+print(df.shape)           # (178, 14)
+
+print("\n=== First 5 Rows ===")
+print(df.head())
+
+print("\n=== Column Names ===")
+print(df.columns.tolist())
+
+# Step 4: Summary Statistics
+print("\n=== Summary Statistics ===")
+print(df.describe())
+# Shows: count, mean, std, min, 25%, 50%, 75%, max for each feature
+
+print("\n=== Class Distribution ===")
+print(df['target'].value_counts())
+# Class 0: 59, Class 1: 71, Class 2: 48
+
+print("\n=== Target Class Names ===")
+print(wine.target_names)
+
+# Step 5: Separate features (X) and target (y)
+X = df.drop('target', axis=1)   # shape: (178, 13)
+y = df['target']                 # shape: (178,)
+
+print("\n=== Features Shape (X) ===", X.shape)
+print("=== Target Shape (y)   ===", y.shape)
+
+# Check data types
+print("\n=== Data Types ===")
+print(df.dtypes)
+
+--- END CODE ---
+
+KEY STATISTICS (from describe()):
+- Alcohol: mean ≈ 13.0, std ≈ 0.81 (range 11.03 – 14.83)
+- Flavanoids: mean ≈ 2.03, std ≈ 1.0 (range 0.34 – 5.08)
+- Features have VERY different scales → StandardScaler is necessary
+  before applying distance-based algorithms like KNN
+
+
+----------------------------------------------------------------
+Q2. StandardScaler + KNN Model — Predict and Evaluate
+(Apply – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+StandardScaler normalizes features to have:
+  Mean = 0, Standard Deviation = 1
+  Formula: z = (x - μ) / σ
+
+WHY SCALE?
+- KNN uses distance metrics (Euclidean) to find neighbors
+- Features with large values (e.g., Proline: ~500–1700) dominate
+  distance calculations over small features (e.g., Ash: ~1.7–3.2)
+- Scaling ensures all features contribute equally
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+wine = load_wine()
+X = pd.DataFrame(wine.data, columns=wine.feature_names)
+y = wine.target
+
+# Step 1: Apply StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+print("Before Scaling - Mean of 'alcohol':", X['alcohol'].mean().round(4))
+print("After Scaling  - Mean of 'alcohol':", X_scaled[:, 0].mean().round(4))
+print("After Scaling  - Std  of 'alcohol':", X_scaled[:, 0].std().round(4))
+
+# Step 2: Split dataset (80/20)
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42
+)
+print(f"\nTrain: {X_train.shape}, Test: {X_test.shape}")
+
+# Step 3: Apply KNN Model (K=5, odd value)
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+
+# Step 4: Predict
+y_pred = knn.predict(X_test)
+
+# Step 5: Evaluate
+acc = accuracy_score(y_test, y_pred)
+print(f"\nKNN Accuracy (with scaling): {acc:.4f}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=wine.target_names))
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(6, 4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Purples',
+            xticklabels=wine.target_names, yticklabels=wine.target_names)
+plt.title("Confusion Matrix — KNN on Wine Dataset (Scaled)")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.tight_layout()
+plt.savefig('knn_wine_cm.png')
+plt.show()
+
+--- END CODE ---
+
+EXPECTED OUTPUT:
+  KNN Accuracy (with scaling): ~0.94–0.97
+
+
+----------------------------------------------------------------
+Q3. Compare Model Performance Before and After Scaling
+(Evaluate – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+This comparison demonstrates WHY feature scaling is critical for KNN.
+
+--- CODE ---
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+import matplotlib.pyplot as plt
+
+# Load data
+wine = load_wine()
+X = pd.DataFrame(wine.data, columns=wine.feature_names)
+y = wine.target
+
+# Split (same split for fair comparison)
+X_train_raw, X_test_raw, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# Apply scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train_raw)
+X_test_scaled = scaler.transform(X_test_raw)
+# NOTE: fit only on train, transform both → avoids data leakage
+
+# Test multiple K values for comparison
+k_values = [1, 3, 5, 7, 9, 11, 13, 15]
+acc_unscaled = []
+acc_scaled = []
+
+for k in k_values:
+    knn = KNeighborsClassifier(n_neighbors=k)
+
+    # Unscaled
+    knn.fit(X_train_raw, y_train)
+    acc_unscaled.append(accuracy_score(y_test, knn.predict(X_test_raw)))
+
+    # Scaled
+    knn.fit(X_train_scaled, y_train)
+    acc_scaled.append(accuracy_score(y_test, knn.predict(X_test_scaled)))
+
+# Print comparison table
+print(f"{'K':>3} | {'Unscaled Acc':>14} | {'Scaled Acc':>12}")
+print("-" * 35)
+for k, u, s in zip(k_values, acc_unscaled, acc_scaled):
+    print(f"{k:>3} | {u:>14.4f} | {s:>12.4f}")
+
+# Best K
+best_k = k_values[acc_scaled.index(max(acc_scaled))]
+print(f"\nBest K (scaled): {best_k} with accuracy {max(acc_scaled):.4f}")
+print(f"Avg Unscaled Acc: {sum(acc_unscaled)/len(acc_unscaled):.4f}")
+print(f"Avg Scaled Acc  : {sum(acc_scaled)/len(acc_scaled):.4f}")
+print(f"Improvement     : {(sum(acc_scaled)-sum(acc_unscaled))/len(k_values):.4f}")
+
+# Visualization
+plt.figure(figsize=(9, 5))
+plt.plot(k_values, acc_unscaled, marker='o', label='Without Scaling', color='tomato', linewidth=2)
+plt.plot(k_values, acc_scaled, marker='s', label='With Scaling', color='steelblue', linewidth=2)
+plt.xlabel("K Value")
+plt.ylabel("Accuracy")
+plt.title("KNN Accuracy: Before vs After StandardScaler")
+plt.legend()
+plt.xticks(k_values)
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.savefig('scaling_comparison.png')
+plt.show()
+print("Comparison plot saved.")
+
+--- END CODE ---
+
+EXPECTED RESULTS:
+  Without Scaling: Accuracy ~0.67–0.75 (poor, dominated by Proline feature)
+  With Scaling:    Accuracy ~0.94–0.97 (excellent, all features equal weight)
+
+WHY SUCH A BIG DIFFERENCE?
+The Wine dataset has features with very different scales:
+  - Proline: 278–1680 (large range)
+  - Ash: 1.36–3.23 (small range)
+  Without scaling, Proline DOMINATES the distance calculation,
+  making other features essentially irrelevant.
+  After scaling, every feature contributes equally.
+
+CONCLUSION:
+Feature scaling is MANDATORY for:
+  ✓ KNN
+  ✓ SVM
+  ✓ Neural Networks
+  ✓ PCA / Dimensionality Reduction
+
+Feature scaling is NOT needed for:
+  ✗ Decision Trees
+  ✗ Random Forest
+  ✗ Naive Bayes
+
+
+----------------------------------------------------------------
+Q4(a). Cost Function: Logistic vs Linear Regression
+(Analyze – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+--- WHY DIFFERENT COST FUNCTIONS? ---
+
+LINEAR REGRESSION — predicts CONTINUOUS values (e.g., house price)
+LOGISTIC REGRESSION — predicts CLASS PROBABILITIES (e.g., 0 or 1)
+
+If we apply the Mean Squared Error (MSE) cost function of Linear
+Regression to Logistic Regression, the result is a NON-CONVEX function.
+This means gradient descent may get STUCK in local minima and fail
+to find the global minimum.
+
+Therefore, a different cost function (Log Loss / Binary Cross-Entropy)
+is used for Logistic Regression, which is CONVEX and guaranteed to
+have a single global minimum.
+
+--- COST FUNCTION: LINEAR REGRESSION ---
+
+Model: ŷ = β₀ + β₁x₁ + β₂x₂ + ... + βₙxₙ
+
+Cost Function (Mean Squared Error):
+  J(θ) = (1/2m) * Σᵢ (ŷᵢ - yᵢ)²
+
+Where:
+  m  = number of training samples
+  ŷᵢ = predicted value for sample i
+  yᵢ = actual value for sample i
+
+PROPERTIES:
+  - Convex (bowl-shaped) → gradient descent always finds global minimum
+  - Penalizes large errors heavily (squared term)
+  - Output is continuous → real number
+
+--- COST FUNCTION: LOGISTIC REGRESSION ---
+
+Model: ŷ = σ(β₀ + β₁x₁ + ... + βₙxₙ) = 1 / (1 + e^(-z))
+
+Where σ is the Sigmoid function, output is between 0 and 1.
+
+Cost Function (Log Loss / Binary Cross-Entropy):
+  J(θ) = -(1/m) * Σᵢ [ yᵢ log(ŷᵢ) + (1 - yᵢ) log(1 - ŷᵢ) ]
+
+Equivalently:
+  If y = 1: Cost = -log(ŷ)
+    → When ŷ → 1: cost → 0  (correct prediction, low penalty)
+    → When ŷ → 0: cost → ∞  (wrong prediction, infinite penalty)
+
+  If y = 0: Cost = -log(1 - ŷ)
+    → When ŷ → 0: cost → 0  (correct prediction)
+    → When ŷ → 1: cost → ∞  (wrong prediction)
+
+PROPERTIES:
+  - Convex → gradient descent finds global minimum
+  - Derived from Maximum Likelihood Estimation (MLE)
+  - Heavy penalty for confident wrong predictions
+  - Designed for probabilistic binary outputs
+
+--- COMPARISON TABLE ---
+
+Property        | Linear Regression       | Logistic Regression
+----------------|-------------------------|----------------------
+Output type     | Continuous (any value)  | Probability (0 to 1)
+Task type       | Regression              | Classification
+Cost function   | MSE: (1/2m)Σ(ŷ-y)²    | Log Loss: -(1/m)Σ[y log(ŷ)+...]
+Shape           | Convex (always)         | Convex (with log loss)
+Activation      | None (linear)           | Sigmoid: 1/(1+e^(-z))
+
+--- VISUAL INTUITION ---
+
+For y=1, log loss cost:
+  ŷ=0.9 → cost = -log(0.9) ≈ 0.10 (small penalty, model is confident and correct)
+  ŷ=0.5 → cost = -log(0.5) ≈ 0.69 (moderate penalty)
+  ŷ=0.1 → cost = -log(0.1) ≈ 2.30 (large penalty, model is confident but WRONG)
+
+
+----------------------------------------------------------------
+Q4(b). Regularization Techniques and Their Roles
+(Understand – 8 Marks)
+----------------------------------------------------------------
+
+ANSWER:
+
+REGULARIZATION is a technique to prevent overfitting by adding a
+penalty term to the model's loss function, discouraging overly
+complex models with large parameter values.
+
+--- 1. L1 REGULARIZATION (Lasso Regression) ---
+
+Cost Function:
+  J(θ) = MSE + λ * Σ|wᵢ|
+
+Where λ (lambda) is the regularization strength hyperparameter.
+
+ROLE:
+  - Penalizes the absolute values of weights
+  - Drives some weights to EXACTLY ZERO → automatic feature selection
+  - Produces SPARSE models (few non-zero weights)
+  - Useful when many features are irrelevant
+
+WHEN TO USE:
+  - When you suspect many features are irrelevant
+  - When you want an interpretable, sparse model
+  - High-dimensional datasets
+
+EXAMPLE:
+  from sklearn.linear_model import Lasso
+  lasso = Lasso(alpha=0.01)
+  lasso.fit(X_train, y_train)
+  # Some feature coefficients will be exactly 0
+
+--- 2. L2 REGULARIZATION (Ridge Regression) ---
+
+Cost Function:
+  J(θ) = MSE + λ * Σwᵢ²
+
+ROLE:
+  - Penalizes the squared values of weights
+  - Shrinks all weights toward zero but NONE become exactly zero
+  - Distributes weight among correlated features
+  - Prevents any single feature from dominating
+
+WHEN TO USE:
+  - When all features are potentially useful
+  - When features are highly correlated (multicollinearity)
+  - Default choice for most regression problems
+
+EXAMPLE:
+  from sklearn.linear_model import Ridge
+  ridge = Ridge(alpha=1.0)
+  ridge.fit(X_train, y_train)
+
+--- 3. ELASTIC NET REGULARIZATION ---
+
+Cost Function:
+  J(θ) = MSE + λ₁*Σ|wᵢ| + λ₂*Σwᵢ²
+
+ROLE:
+  - Combines L1 and L2 penalties
+  - Benefits of both: feature selection AND weight distribution
+  - More robust when features are correlated AND some are irrelevant
+
+EXAMPLE:
+  from sklearn.linear_model import ElasticNet
+  en = ElasticNet(alpha=0.1, l1_ratio=0.5)
+  en.fit(X_train, y_train)
+
+--- 4. DROPOUT (for Neural Networks) ---
+
+ROLE:
+  - Randomly "drops" (deactivates) neurons during training
+  - Prevents neurons from co-adapting (co-dependency)
+  - Forces the network to learn redundant representations
+  - Equivalent to training an ensemble of many networks
+
+--- COMPARISON TABLE ---
+
+Technique   | Penalty          | Sparsity | Key Use Case
+------------|------------------|----------|------------------
+L1 (Lasso)  | λ*Σ|wᵢ|         | YES (→0) | Feature selection
+L2 (Ridge)  | λ*Σwᵢ²           | NO       | Multicollinearity
+ElasticNet  | L1 + L2          | Partial  | Both problems
+Dropout     | Random deact.    | N/A      | Neural Networks
+
+--- EFFECT OF λ (LAMBDA) ---
+  λ = 0     → No regularization → Risk of overfitting
+  Small λ   → Slight regularization → Flexible model
+  Large λ   → Strong regularization → Risk of underfitting (bias↑)
+
+The optimal λ is found via Cross-Validation (e.g., GridSearchCV).
+
+================================================================
+END OF SET C
+================================================================
